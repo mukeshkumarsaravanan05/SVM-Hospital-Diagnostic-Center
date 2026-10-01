@@ -139,3 +139,18 @@ EGS PILLAY Engineering College
 
 This project is intended for research and educational purposes.
 
+---
+
+## Application Screenshots
+
+### 1. Main Interface
+![SVM Hospital Diagnostic Center main interface](Screenshots/main-interface.png)
+
+### 2. Disease Prediction Results
+![Five-class chest X-ray disease prediction probabilities](Screenshots/prediction-result.png)
+
+### 3. Grad-CAM Explainability
+![Original chest X-ray and Grad-CAM heatmap](Screenshots/gradcam-result.png)
+
+*These screenshots demonstrate the application's interface and AI outputs. Results are for research and educational decision support only and must not be treated as a standalone medical diagnosis.*
+
