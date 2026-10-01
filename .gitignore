@@ -45,3 +45,5 @@ startup_time.txt
 *.dicom
 patient_data/
 patient_records/
+sample_images/
+generated_reports/
