@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Large datasets
+datasets/
+
+# Runtime/user-generated data
+uploads/
+generated_reports/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Archives
+*.zip
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Old release/testing folders
+SVM_HOSPITAL_DIAGNOSTIC_CENTER_V1_RELEASE/
+V1_RELEASE_TEST/
+
+# Temporary test files
+corrupted.png
+test_invalid.txt
+import_times.txt
+startup_time.txt
+
+# Medical data and generated reports
+*.pdf
+*.dcm
+*.dicom
+patient_data/
+patient_records/
