@@ -175,100 +175,150 @@ def make_pdf(
     quality: dict,
     patient_details: dict,
 ) -> bytes:
-    """Create a research PDF with examination details, metrics, image, and Grad-CAM."""
+    """Build a structured, three-page research report matching the supplied reference."""
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import mm
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-        Image as RLImage, KeepTogether,
+        Image as RLImage, PageBreak, KeepTogether,
     )
+
+    navy = colors.HexColor("#12334D")
+    pale = colors.HexColor("#EAF2F8")
+    stripe = colors.HexColor("#F4F8FB")
+    border = colors.HexColor("#C9D7E2")
+    ink = colors.HexColor("#253746")
+    muted = colors.HexColor("#647789")
+    amber = colors.HexColor("#FFF7E2")
+
+    report_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    generated = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    exam_date = str(patient_details.get("exam_date") or datetime.now().strftime("%Y-%m-%d"))
+    assessment_level = str(quality.get("risk_level", "REVIEW REQUIRED")).upper()
+    if assessment_level in {"LOW", "LOW RISK"}:
+        assessment_level = "LOW"
+    else:
+        assessment_level = "MODERATE" if "MODERATE" in assessment_level else assessment_level
 
     output = io.BytesIO()
     doc = SimpleDocTemplate(
         output, pagesize=A4, rightMargin=15 * mm, leftMargin=15 * mm,
-        topMargin=14 * mm, bottomMargin=14 * mm,
+        topMargin=15 * mm, bottomMargin=17 * mm,
+        title="AI-Assisted Chest X-ray Diagnostic Report",
+        author="SVM Hospital Diagnostic Center",
     )
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(
-        name="SmallMuted", parent=styles["BodyText"], fontSize=8,
-        leading=11, textColor=colors.HexColor("#526477"),
+        name="ReportTitle", parent=styles["Title"], fontName="Helvetica-Bold",
+        fontSize=17, leading=20, alignment=TA_LEFT, textColor=colors.white,
+        spaceAfter=5,
     ))
-    story = [
-        Paragraph("SVM Hospital Diagnostic Center", styles["Title"]),
-        Paragraph("AI-Assisted Chest X-ray Analysis — Research Report", styles["Heading2"]),
-        Paragraph(f"Report generated: {datetime.now().strftime('%d %B %Y, %H:%M:%S')}", styles["Normal"]),
-        Spacer(1, 4 * mm),
-        Paragraph(
-            "<b>Research / educational use only.</b> This report is not a diagnosis, "
-            "and model probabilities are not calibrated clinical certainty. Results must "
-            "be reviewed by a qualified clinician or radiologist.",
-            styles["BodyText"],
-        ),
-        Spacer(1, 5 * mm),
-        Paragraph("Patient & Examination Details", styles["Heading2"]),
+    styles.add(ParagraphStyle(
+        name="ReportSubtitle", parent=styles["Normal"], fontSize=9,
+        leading=12, textColor=colors.HexColor("#DCE8F1"),
+    ))
+    styles.add(ParagraphStyle(
+        name="SectionBar", parent=styles["Heading2"], fontName="Helvetica-Bold",
+        fontSize=9, leading=12, textColor=colors.white, backColor=navy,
+        borderPadding=(5, 7, 5, 7), spaceBefore=2 * mm, spaceAfter=2 * mm,
+    ))
+    styles.add(ParagraphStyle(
+        name="SmallMuted", parent=styles["BodyText"], fontSize=7.5,
+        leading=10, textColor=muted,
+    ))
+    styles.add(ParagraphStyle(
+        name="Cell", parent=styles["BodyText"], fontSize=8, leading=10,
+        textColor=ink,
+    ))
+    styles.add(ParagraphStyle(
+        name="CellBold", parent=styles["Cell"], fontName="Helvetica-Bold",
+    ))
+    styles.add(ParagraphStyle(
+        name="CenterBig", parent=styles["Heading2"], fontName="Helvetica-Bold",
+        fontSize=16, leading=19, alignment=TA_CENTER, textColor=navy,
+    ))
+    styles.add(ParagraphStyle(
+        name="Disclaimer", parent=styles["BodyText"], fontSize=8,
+        leading=11, textColor=ink, backColor=amber, borderPadding=7,
+    ))
+
+    def section(text):
+        return Paragraph(text.upper(), styles["SectionBar"])
+
+    def styled_table(rows, widths, header=True, font_size=8):
+        table = Table(rows, colWidths=widths, repeatRows=1 if header else 0, hAlign="LEFT")
+        commands = [
+            ("GRID", (0, 0), (-1, -1), 0.45, border),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS", (0, 1 if header else 0), (-1, -1), [colors.white, stripe]),
+        ]
+        if header:
+            commands += [
+                ("BACKGROUND", (0, 0), (-1, 0), pale),
+                ("TEXTCOLOR", (0, 0), (-1, 0), navy),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ]
+        table.setStyle(TableStyle(commands))
+        return table
+
+    def footer(canvas, document):
+        canvas.saveState()
+        page_w, _ = A4
+        canvas.setStrokeColor(border)
+        canvas.setLineWidth(0.5)
+        canvas.line(15 * mm, 12 * mm, page_w - 15 * mm, 12 * mm)
+        canvas.setFont("Helvetica", 6.5)
+        canvas.setFillColor(muted)
+        canvas.drawString(15 * mm, 7.5 * mm, "CONFIDENTIAL • AI-ASSISTED DECISION SUPPORT • RESEARCH USE ONLY")
+        canvas.drawRightString(page_w - 15 * mm, 7.5 * mm, f"Page {document.page}")
+        canvas.restoreState()
+
+    def safe_text(value):
+        return escape(str(value if value not in (None, "") else "Not provided")).replace("\n", "<br/>")
+
+    story = []
+
+    # PAGE 1 — Report metadata, validation, images and image quality.
+    banner = Table([[
+        [
+            Paragraph("SVM HOSPITAL DIAGNOSTIC CENTER", styles["ReportTitle"]),
+            Paragraph("AI-Assisted Chest X-ray Diagnostic Report", styles["ReportSubtitle"]),
+        ],
+        [
+            Paragraph("<b>CONFIDENTIAL</b><br/>" + datetime.now().strftime("%d %b %Y"), styles["ReportSubtitle"]),
+            Spacer(1, 4 * mm),
+            Paragraph("<b>RESEARCH<br/>DEMONSTRATION</b>", styles["ReportSubtitle"]),
+        ],
+    ]], colWidths=[116 * mm, 49 * mm])
+    banner.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), navy),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story += [banner, Spacer(1, 4 * mm)]
+
+    metadata = [
+        ["REPORT TYPE", "REPORT ID", "GENERATED"],
+        ["AI Chest X-ray Assessment", report_id, generated],
     ]
-
-    details_rows = [["Field", "Recorded value"]]
-    for label, key in [
-        ("Patient / case ID", "case_id"),
-        ("Patient name / anonymized label", "patient_label"),
-        ("Age", "age"),
-        ("Sex", "sex"),
-        ("Examination date", "exam_date"),
-        ("Clinical indication / notes", "notes"),
-    ]:
-        value = str(patient_details.get(key, "") or "Not provided")
-        value = escape(value).replace("\n", "<br/>")
-        details_rows.append([label, Paragraph(value, styles["BodyText"])])
-    details_table = Table(details_rows, colWidths=[62 * mm, 103 * mm], repeatRows=1)
-    details_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173B57")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), .4, colors.HexColor("#CBD5E1")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F4F8FB")]),
-        ("PADDING", (0, 0), (-1, -1), 6),
-    ]))
-    story += [details_table, Spacer(1, 5 * mm), Paragraph("Analysis Results", styles["Heading2"])]
-
-    rows = [
-        ["Item", "Result"],
-        ["Model-predicted class", predicted_class],
-        ["Model probability for predicted class", f"{confidence:.2f}%"],
-        ["X-ray validator output", f"{validation_percent:.2f}%"],
-        ["Validator threshold passed", "Yes" if valid else "No"],
-        ["Resolution", str(quality.get("resolution", "Not available"))],
-        ["Brightness", str(quality.get("brightness", "Not available"))],
-        ["Contrast", str(quality.get("contrast", "Not available"))],
-        ["Sharpness", str(quality.get("sharpness", "Not available"))],
-        ["Image-quality score", f"{quality.get('score', 'Not available')}/100"],
-        ["Quality risk", str(quality.get("risk_level", "Not available"))],
-        ["Review reason", str(quality.get("review_reason", "Not available"))],
+    story += [styled_table(metadata, [55 * mm, 50 * mm, 60 * mm]), section("X-ray validation")]
+    validation_rows = [
+        ["Validation item", "Result"],
+        ["X-ray validator probability", f"{float(validation_percent):.2f}%"],
+        ["Configured validation threshold", "Project-configured threshold (see application settings)"],
+        ["Validation result", "VALIDATOR PASSED" if valid else "VALIDATOR DID NOT PASS"],
     ]
-    table = Table(rows, colWidths=[75 * mm, 90 * mm], repeatRows=1)
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173B57")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), .4, colors.HexColor("#CBD5E1")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F4F8FB")]),
-        ("PADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story += [table, Spacer(1, 5 * mm), Paragraph("Model Probability Distribution", styles["Heading2"])]
-
-    prob_rows = [["Class", "Model probability"]]
-    for name, value in zip(CLASSES, probs):
-        prob_rows.append([str(name), f"{float(value) * 100:.2f}%"])
-    prob_table = Table(prob_rows, colWidths=[100 * mm, 65 * mm], repeatRows=1)
-    prob_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173B57")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), .4, colors.HexColor("#CBD5E1")),
-        ("PADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story += [prob_table, Spacer(1, 5 * mm), Paragraph("Source X-ray & Grad-CAM Visualization", styles["Heading2"])]
+    story += [styled_table(validation_rows, [72 * mm, 93 * mm]), section("Source radiograph & AI explanation")]
 
     original_buffer = io.BytesIO()
     original.convert("RGB").save(original_buffer, format="JPEG", quality=90)
@@ -278,23 +328,131 @@ def make_pdf(
         heatmap_buffer, format="JPEG", quality=90
     )
     heatmap_buffer.seek(0)
-    image_table = Table(
-        [[RLImage(original_buffer, width=77 * mm, height=62 * mm),
-          RLImage(heatmap_buffer, width=77 * mm, height=62 * mm)]],
-        colWidths=[82 * mm, 82 * mm],
-    )
-    image_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
-    story += [
-        image_table,
-        Spacer(1, 3 * mm),
-        Paragraph(
-            "Grad-CAM is a model-explanation visualization, not proof that the model "
-            "focused on clinically valid features. Validator scores and model probabilities "
-            "are not substitutes for clinical assessment.",
-            styles["SmallMuted"],
-        ),
+    image_table = Table([
+        [Paragraph("<b>ORIGINAL CHEST X-RAY</b>", styles["Cell"]),
+         Paragraph("<b>GRAD-CAM AI ATTENTION MAP</b>", styles["Cell"])],
+        [RLImage(original_buffer, width=75 * mm, height=59 * mm, kind="proportional"),
+         RLImage(heatmap_buffer, width=75 * mm, height=59 * mm, kind="proportional")],
+    ], colWidths=[82.5 * mm, 82.5 * mm], hAlign="LEFT")
+    image_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), pale),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.45, border),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story += [image_table, section("Image quality assessment")]
+    quality_rows = [["Metric", "Result"]]
+    for label, key in [
+        ("Resolution", "resolution"), ("Brightness", "brightness"),
+        ("Contrast", "contrast"), ("Sharpness", "sharpness"),
+    ]:
+        quality_rows.append([label, str(quality.get(key, "Not available"))])
+    quality_rows += [
+        ["Overall quality score", f"{quality.get('score', 'Not available')}/100"],
+        ["Quality risk", str(quality.get("risk_level", "Not available")).upper()],
     ]
-    doc.build(story)
+    story += [styled_table(quality_rows, [72 * mm, 93 * mm]), PageBreak()]
+
+    # PAGE 2 — Diagnosis summary, probability distribution and limitations.
+    story += [section("AI diagnostic summary")]
+    summary = Table([
+        [Paragraph("<b>AI PREDICTED CONDITION</b>", styles["Cell"]),
+         Paragraph("<b>MODEL CONFIDENCE</b>", styles["Cell"])],
+        [Paragraph(escape(str(predicted_class)).upper(), styles["CenterBig"]),
+         Paragraph(f"{float(confidence):.2f}%", styles["CenterBig"])],
+    ], colWidths=[82.5 * mm, 82.5 * mm])
+    summary.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), pale),
+        ("GRID", (0, 0), (-1, -1), 0.45, border),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story += [summary, section("AI assessment status")]
+    status = Table([
+        [Paragraph("<b>ASSESSMENT LEVEL</b>", styles["Cell"]),
+         Paragraph("<b>CLINICAL REVIEW</b>", styles["Cell"])],
+        [Paragraph(escape(assessment_level), styles["CenterBig"]),
+         Paragraph("REQUIRED", styles["CenterBig"])],
+        ["MODEL OUTPUT", "IMAGE QUALITY"],
+        [f"{float(confidence):.2f}%", f"{quality.get('score', 'Not available')}/100"],
+    ], colWidths=[82.5 * mm, 82.5 * mm])
+    status.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), pale),
+        ("BACKGROUND", (0, 2), (-1, 2), stripe),
+        ("TEXTCOLOR", (0, 2), (-1, 2), navy),
+        ("FONTNAME", (0, 2), (-1, 2), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.45, border),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    story += [status, section("AI probability distribution")]
+    prob_rows = [["Disease class", "Probability"]]
+    for name, value in zip(CLASSES, probs):
+        prob_rows.append([str(name), f"{float(value) * 100:.2f}%"])
+    story += [styled_table(prob_rows, [82.5 * mm, 82.5 * mm]), section("Interpretation & limitations")]
+    story += [
+        Paragraph(
+            "The predicted class and probability values are outputs of the configured AI pipeline. "
+            "They should be interpreted alongside the source radiograph, image quality, clinical "
+            "history, and a professional radiological assessment.", styles["BodyText"]),
+        Spacer(1, 2 * mm),
+        Paragraph(
+            "Grad-CAM is an interpretability visualization. It does not establish that highlighted "
+            "regions are clinically meaningful, and model probabilities are not calibrated clinical certainty.",
+            styles["BodyText"]),
+        section("Clinical disclaimer"),
+        Paragraph(
+            "For research and educational decision-support use only. This AI-generated assessment is "
+            "not a standalone medical diagnosis and must not replace evaluation by a qualified clinician "
+            "or radiologist. Final clinical decisions must be made by an appropriately qualified professional.",
+            styles["Disclaimer"]),
+        PageBreak(),
+    ]
+
+    # PAGE 3 — System status and space for human clinical review.
+    story += [section("AI system status")]
+    system_rows = [
+        ["System item", "Status"],
+        ["Report generation", "Completed"],
+        ["Image validation", "Passed" if valid else "Did not pass"],
+        ["Prediction output", "Recorded in this report"],
+        ["Clinical validation", "Not established by this report"],
+        ["Report identifier", report_id],
+    ]
+    story += [styled_table(system_rows, [72 * mm, 93 * mm]), section("Clinical review")]
+    review_rows = [
+        [Paragraph("<b>Reviewer name:</b>", styles["Cell"]), ""],
+        [Paragraph("<b>Professional title / registration:</b>", styles["Cell"]), ""],
+        [Paragraph("<b>Review notes:</b>", styles["Cell"]), ""],
+        [Paragraph("<b>Signature:</b>", styles["Cell"]), "________________________________________"],
+        [Paragraph("<b>Date:</b>", styles["Cell"]), "________________________________________"],
+    ]
+    review_table = Table(review_rows, colWidths=[52 * mm, 113 * mm],
+                         rowHeights=[12 * mm, 14 * mm, 34 * mm, 13 * mm, 13 * mm])
+    review_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), pale),
+        ("GRID", (0, 0), (-1, -1), 0.45, border),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    story += [
+        review_table, Spacer(1, 7 * mm),
+        Paragraph(
+            "This document records software outputs for the uploaded image only. It does not establish "
+            "diagnostic accuracy, clinical validity, or patient outcome.", styles["SmallMuted"]),
+    ]
+
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return output.getvalue()
 
 
@@ -455,4 +613,3 @@ else:
 
 st.divider()
 st.caption("SVM Hospital Diagnostic Center • Biomedical Engineering research project by Mukesh Kumar")
-
