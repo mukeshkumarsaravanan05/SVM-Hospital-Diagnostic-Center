@@ -1,11 +1,9 @@
 from __future__ import annotations
-
 import io
 import os
 import tempfile
 from datetime import datetime
 from html import escape
-
 import numpy as np
 import streamlit as st
 from PIL import Image, ImageEnhance
