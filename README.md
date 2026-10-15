@@ -236,16 +236,15 @@ Check the repository for a license file before redistributing or reusing the cod
 *Built as a biomedical engineering research and educational project exploring AI-assisted medical image analysis and explainability.*
 ## 🖥️ Application Screenshots
 
-### Main Dashboard
-![SVM Hospital Diagnostic Center dashboard](Screenshots/dashboard.png)
+### 1. Main Dashboard
+![SVM Hospital Diagnostic Center - Main Dashboard](<Screenshots/Main dashboard.png>)
 
-### AI Prediction and Probability Distribution
-![Chest X-ray prediction results](Screenshots/prediction_results.png)
+### 2. AI Prediction Results
+![Chest X-ray prediction results and probability distribution](<Screenshots/Prediction results.png>)
 
-### Grad-CAM Explainability
-![Grad-CAM visualization](Screenshots/gradcam.png)
+### 3. Explainability and PDF Report
+![Grad-CAM explainability and PDF research report](<Screenshots/Explainability and report.png>)
 
-### Generated PDF Research Report
-![PDF research report](Screenshots/pdf_report.png)
+---
 
-> Replace the example image paths above with the exact filenames in your `Screenshots` folder. GitHub image paths are case-sensitive.
+🚀 **[Launch the Live Application](https://svm-hospital-diagnostic-center.streamlit.app/)**
