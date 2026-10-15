@@ -237,14 +237,12 @@ Check the repository for a license file before redistributing or reusing the cod
 ## 🖥️ Application Screenshots
 
 ### 1. Main Dashboard
-![SVM Hospital Diagnostic Center - Main Dashboard](<Screenshots/Main dashboard.png>)
+![SVM Hospital Diagnostic Center - Main Dashboard](Screenshots/Main%20dashboard.png)
 
 ### 2. AI Prediction Results
-![Chest X-ray prediction results and probability distribution](<Screenshots/Prediction results.png>)
+![Chest X-ray prediction results and probability distribution](Screenshots/Prediction%20results.png)
 
 ### 3. Explainability and PDF Report
-![Grad-CAM explainability and PDF research report](<Screenshots/Explainability and report.png>)
-
----
+![Grad-CAM explainability and PDF research report](Screenshots/Explainability%20and%20report.png)
 
 🚀 **[Launch the Live Application](https://svm-hospital-diagnostic-center.streamlit.app/)**
