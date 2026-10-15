@@ -25,6 +25,17 @@ The application provides a web interface where users can upload an X-ray image, 
 
 The project is designed to explore how AI-based image classification and visual explanations can support biomedical engineering research.
 
+## 🖥️ Application Screenshots
+
+### 1. Main Dashboard
+![SVM Hospital Diagnostic Center - Main Dashboard](Screenshots/Main%20dashboard.png)
+
+### 2. AI Prediction Results
+![Chest X-ray prediction results](Screenshots/Prediction%20results.png)
+
+### 3. Explainability and PDF Report
+![Grad-CAM explainability and PDF report](Screenshots/Explainability%20and%20report.png)
+
 ## ✨ Key Features
 
 - **Chest X-ray classification:** Predicts one of five configured classes.
